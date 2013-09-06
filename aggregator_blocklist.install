@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file
+ * Install and uninstall functions for the aggregator_blocklist module.
+ */
+
+/**
+ * Implements hook_schema_alter
+ * @param type $schema
+ * @return boolean 
+ */
+function aggregator_blocklist_schema_alter(&$schema) {
+  $schema['aggregator_feed']['fields']['ffid'] = array(
+    'type' => 'int',
+    'description' => 'Field ffid added by aggregator_blocklist. Contains foreign file manged id (file_managed.fid).',
+  );
+  $schema['aggregator_feed']['fields']['rss_origin_url'] = array(
+    'type' => 'text',
+    'description' => 'Field rss_origin_url added by aggregator_blocklist. Contains url to the site where the processed rss comes from.',
+  );
+  return $schema;
+}
+
+/**
+ * Aggregator_blocklist install script
+ */
+function aggregator_blocklist_install() {
+  $schema = drupal_get_schema('aggregator_feed');
+  //db_add_field($table, $field, $spec, $keys_new = array())
+  db_add_field('aggregator_feed', 'ffid', $schema['fields']['ffid']);
+  db_add_field('aggregator_feed', 'rss_origin_url', $schema['fields']['rss_origin_url']);
+  drupal_set_message("Aggregator blocklist installed");
+}
+
+/**
+ * Aggregator_blocklist uninstall script
+ */
+function aggregator_blocklist_uninstall() {
+  db_drop_field('aggregator_feed', 'ffid');
+  db_drop_field('aggregator_feed', 'rss_origin_url');
+  drupal_set_message("Aggregator blocklist uninstalled");
+}

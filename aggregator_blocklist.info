@@ -1,0 +1,6 @@
+name = Aggregator Blocklist
+description = New block using aggregator core module
+core = 7.x
+package = Other
+dependencies[] = aggregator
+dependencies[] = media
