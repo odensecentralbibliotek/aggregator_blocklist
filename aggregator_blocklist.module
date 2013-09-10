@@ -132,7 +132,7 @@ function theme_aggregator_blocklist_itemlist($variables) {
   $rss_title = $variables['feed']['title'];
   $page_url = ($variables['feed']['rss_origin_url'] == "") ? $variables['feed']['url'] : $variables['feed']['rss_origin_url'];
   $file = $variables['feed']['ffid'] ? file_load($variables['feed']['ffid']) : FALSE;
-  if(is_valid_image($url)) {
+  if(is_valid_image($variables['feed']['uri'])) {
     /**
      * scale thumbnail
      *
