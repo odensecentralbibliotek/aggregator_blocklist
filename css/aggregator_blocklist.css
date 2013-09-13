@@ -20,3 +20,12 @@ div.rssblock-itemlist div.media-item {
 div.rssblock-itemlist div.media-item .media-thumbnail {
   width: 100%;
 }
+
+div.rss-image {
+  clear: both;
+}
+
+div.rss-image a {
+  float: right;
+  margin: 10px 0px;
+}
