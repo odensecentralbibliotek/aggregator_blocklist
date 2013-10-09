@@ -12,26 +12,6 @@ function aggregator_blocklist_init() {
 }
 
 /**
- * Implements hook_block_info().
- */
-function aggregator_blocklist_block_info() {
-  $blocks = array();
-  $result = db_query('SELECT cid, title FROM {aggregator_category} ORDER BY title');
-  foreach ($result as $category) {
-    $blocks['category-' . $category->cid]['info'] = t(
-      '!title category latest items',
-      array('!title' => "Feed (blocklist): " . $category->title));
-  }
-  $result = db_query('SELECT fid, title FROM {aggregator_feed} WHERE block <> 0 ORDER BY fid');
-  foreach ($result as $feed) {
-    $blocks['feed-' . $feed->fid]['info'] = t(
-      '!title feed latest items',
-      array('!title' => "Feed (blocklist): " . $feed->title));
-  }
-  return $blocks;
-}
-
-/**
  * implements hook_block_view();
  */
 function aggregator_blocklist_block_view($delta = '') {
@@ -42,13 +22,15 @@ function aggregator_blocklist_block_view($delta = '') {
     switch ($type) {
       case 'feed':
         $query = db_select("aggregator_feed", "f");
-        $query->leftJoin("file_managed", "fm", "fm.fid = f.ffid");
+        $query->join("aggregator_blocklist_feed_extension", "fe", "fe.af_fid = f.fid");
+        $query->leftJoin("file_managed", "fm", "fm.fid = fe.fm_fid");
         $query_and = db_and();
         $query_and->condition("block", "0", "<>")
                   ->condition("f.fid", $id);
         $query->fields("f", array(
-          "url", "title", "block", "ffid", "fid", "rss_origin_url"))
+          "url", "title", "block", "fid"))
               ->fields("fm", array("uri"))
+              ->fields("fe", array("fm_fid", "rss_origin_url"))
               ->condition($query_and);
         $feed_result = $query->execute();
         $feed = $feed_result->fetchAssoc();
@@ -131,7 +113,7 @@ function theme_aggregator_blocklist_itemlist($variables) {
   $output .= implode("\n", $variables['items']);
   $rss_title = $variables['feed']['title'];
   $page_url = ($variables['feed']['rss_origin_url'] == "") ? $variables['feed']['url'] : $variables['feed']['rss_origin_url'];
-  $file = $variables['feed']['ffid'] ? file_load($variables['feed']['ffid']) : FALSE;
+  $file = $variables['feed']['fm_fid'] ? file_load($variables['feed']['fm_fid']) : FALSE;
   if(is_valid_image($variables['feed']['uri'])) {
     /**
      * scale thumbnail
@@ -229,20 +211,26 @@ function aggregator_blocklist_permission() {
  */
 function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_state, &$form_id) {
   /* @var $test type */
-  $q = db_select("aggregator_feed", "f");
-  $q->fields("f", array("ffid", "rss_origin_url"))
-    ->condition("fid", $form['fid']['#value']);
-  $r = $q->execute();
-  $feed = $r->fetchAssoc();
-  if($feed) {
-    $file = $feed["ffid"] ? file_load($feed["ffid"]) : FALSE;
+  $file = new stdClass();
+  $file->fid = NULL;
+  $feed = array();
+  $feed["rss_origin_url"] = NULL;
+  if(isset($form['fid']['#value'])) {
+    $q = db_select("aggregator_feed", "f");
+    $q->join("aggregator_blocklist_feed_extension", "fe", "fe.af_fid = f.fid");
+    $q->fields("fe", array("fm_fid", "rss_origin_url", "af_fid"))
+      ->condition("af_fid", $form['fid']['#value']);
+    $r = $q->execute();
+    $feed = $r->fetchAssoc();
+    if($feed) {
+      $file = $feed["fm_fid"] ? file_load($feed["fm_fid"]) : FALSE;
+    }
   }
-
   /**
    * Feed object available through form_state:
    * $form_state['build_info']['args'][0]
    **/
-  $form['ffid'] = array(
+  $form['fm_fid'] = array(
     '#type' => 'media',
     '#title' => t('Attach image'),
     '#description' => t('The fully-qualified URL of the feed image.'),
@@ -263,7 +251,7 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
   if ($form_id == 'aggregator_form_feed') {
     // aggregator_blocklist will take over submit and validate //
     $form['#submit'][0] = 'aggregator_blocklist_form_feed_submit';
-    $form['#validate'][0] = 'aggregator_blocklist_form_feed_validate';
+    $form['#validate'][0] = 'aggregator_form_feed_validate';
   }
 }
 
@@ -278,7 +266,15 @@ function aggregator_blocklist_form_feed_submit($form, &$form_state) {
     // Unset the title.
     unset($form_state['values']['title']);
   }
-  $form_state['values']['ffid'] = $form_state['input']['fid'];
+  /*
+  if ($form_state['values']['op'] == t('Save')) {
+    $fid = $form_state['values']['fid'];
+    // Unset the feed id.
+    unset($form_state['values']['fid']);
+  }*/
+  $form_state['values']['fm_fid'] = $form_state['input']['fid'];
+  aggregator_save_feed($form_state['values']);
+  //TODO save extra table
   aggregator_blocklist_save_feed($form_state['values']);
   if (isset($form_state['values']['fid'])) {
     if (isset($form_state['values']['title'])) {
@@ -318,110 +314,60 @@ function aggregator_blocklist_form_feed_submit($form, &$form_state) {
  *   An associative array describing the feed to be added/edited/deleted.
  */
 function aggregator_blocklist_save_feed($edit) {
-  if (!empty($edit['fid'])) {
-    // An existing feed is being modified, delete the category listings.
-    db_delete('aggregator_category_feed')
-      ->condition('fid', $edit['fid'])
-      ->execute();
-  }
   if (!empty($edit['fid']) && !empty($edit['title'])) {
-    db_update('aggregator_feed')
-      ->condition('fid', $edit['fid'])
+    //condition update
+    //drupal_set_message("UPDATE");
+    db_update('aggregator_blocklist_feed_extension')
+      ->condition('af_fid', $edit['fid'])
       ->fields(array(
-        'title' => $edit['title'],
-        'url' => $edit['url'],
-        'ffid' => $edit['ffid'],
-        'refresh' => $edit['refresh'],
-        'block' => $edit['block'],
+        'fm_fid' => $edit['fm_fid'],
         'rss_origin_url' => $edit['rss_origin_url'],
       ))
       ->execute();
   }
   elseif (!empty($edit['fid'])) {
-    $iids = db_query('SELECT iid FROM {aggregator_item} WHERE fid = :fid', array(':fid' => $edit['fid']))->fetchCol();
-    if ($iids) {
-      db_delete('aggregator_category_item')
-        ->condition('iid', $iids, 'IN')
-        ->execute();
-    }
-    db_delete('aggregator_feed')
-      ->condition('fid', $edit['fid'])
+    //condition delete
+    //drupal_set_message("DELETE");
+    db_delete('aggregator_blocklist_feed_extension')
+      ->condition('af_fid', $edit['fid'])
       ->execute();
-    db_delete('aggregator_item')
-      ->condition('fid', $edit['fid'])
-      ->execute();
-    // Make sure there is no active block for this feed.
-    if (module_exists('block')) {
-      db_delete('block')
-        ->condition('module', 'aggregator')
-        ->condition('delta', 'feed-' . $edit['fid'])
-        ->execute();
-    }
   }
   elseif (!empty($edit['title'])) {
-    $edit['fid'] = db_insert('aggregator_feed')
+    // condition new
+    //drupal_set_message("CREATE");
+    $fid = db_select("aggregator_feed", "f")
+        ->fields("f", array("fid"))
+        ->condition("title", $edit["title"])
+        ->execute()
+        ->fetchField();
+    $edit['af_fid'] = $fid;
+    $edit['fe_fid'] = db_insert('aggregator_blocklist_feed_extension')
       ->fields(array(
-        'title' => $edit['title'],
-        'url' => $edit['url'],
-        'refresh' => $edit['refresh'],
-        'block' => $edit['block'],
-        'link' => '',
-        'description' => '',
-        'image' => '',
-        'ffid' => $edit['ffid'],
+        'af_fid' => $edit['af_fid'],
+        'fm_fid' => $edit['fm_fid'],
         'rss_origin_url' => $edit['rss_origin_url'],
       ))
       ->execute();
 
   }
-  if (!empty($edit['title'])) {
-    // The feed is being saved, save the categories as well.
-    if (!empty($edit['category'])) {
-      foreach ($edit['category'] as $cid => $value) {
-        if ($value) {
-          db_insert('aggregator_category_feed')
-            ->fields(array(
-              'fid' => $edit['fid'],
-              'cid' => $cid,
-            ))
-            ->execute();
-        }
-      }
-    }
-  }
 }
 
 /**
- * Form validation handler for aggregator_blocklist_form_feed().
- *
- * @see aggregator_blocklist_form_feed_submit()
+ * Implements hook_block_info().
  */
-function aggregator_blocklist_form_feed_validate($form, &$form_state) {
-  if ($form_state['values']['op'] == t('Save')) {
-    // Ensure URL is valid.
-    if (!valid_url($form_state['values']['url'], TRUE)) {
-      form_set_error('url', t('The URL %url is invalid. Enter a fully-qualified URL, such as http://www.example.com/feed.xml.', array('%url' => $form_state['values']['url'])));
-    }
-    // Check for duplicate titles.
-    if (isset($form_state['values']['fid'])) {
-      $result = db_query("SELECT title, url FROM {aggregator_feed} WHERE (title = :title OR url = :url) AND fid <> :fid",
-        array(
-          ':title' => $form_state['values']['title'],
-          ':url' => $form_state['values']['url'],
-          ':fid' => $form_state['values']['fid']
-        )
-      );
-    }
-    else {
-      $result = db_query("SELECT title, url FROM {aggregator_feed} WHERE title = :title OR url = :url", array(':title' => $form_state['values']['title'], ':url' => $form_state['values']['url']));
-    }
-    foreach ($result as $feed) {
-      if (strcasecmp($feed->title, $form_state['values']['title']) == 0) {
-        form_set_error('title', t('A feed named %feed already exists. Enter a unique title.', array('%feed' => $form_state['values']['title'])));
-      }
-      if (strcasecmp($feed->url, $form_state['values']['url']) == 0) {
-        form_set_error('url', t('A feed with this URL %url already exists. Enter a unique URL.', array('%url' => $form_state['values']['url'])));
-      }
-    }
+function aggregator_blocklist_block_info() {
+  $blocks = array();
+  $result = db_query('SELECT cid, title FROM {aggregator_category} ORDER BY title');
+  foreach ($result as $category) {
+    $blocks['category-' . $category->cid]['info'] = t(
+      '!title category latest items',
+      array('!title' => "Feed (blocklist): " . $category->title));
   }
+  $result = db_query('SELECT fid, title FROM {aggregator_feed} WHERE block <> 0 ORDER BY fid');
+  foreach ($result as $feed) {
+    $blocks['feed-' . $feed->fid]['info'] = t(
+      '!title feed latest items',
+      array('!title' => "Feed (blocklist): " . $feed->title));
+  }
+  return $blocks;
 }

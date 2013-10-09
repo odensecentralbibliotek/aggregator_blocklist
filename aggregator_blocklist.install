@@ -11,13 +11,17 @@
  * @return boolean 
  */
 function aggregator_blocklist_schema_alter(&$schema) {
-  $schema['aggregator_feed']['fields']['ffid'] = array(
+  $schema['aggregator_blocklist_feed_extension']['fields']['fm_fid'] = array(
     'type' => 'int',
-    'description' => 'Field ffid added by aggregator_blocklist. Contains foreign file manged id (file_managed.fid).',
+    'description' => 'Field fm_fid contains foreign file manged id (file_managed.fid).',
   );
-  $schema['aggregator_feed']['fields']['rss_origin_url'] = array(
+  $schema['aggregator_blocklist_feed_extension']['fields']['rss_origin_url'] = array(
     'type' => 'text',
-    'description' => 'Field rss_origin_url added by aggregator_blocklist. Contains url to the site where the processed rss comes from.',
+    'description' => 'Field rss_origin_url contains url to the site where the processed rss comes from.',
+  );
+  $schema['aggregator_blocklist_feed_extension']['fields']['af_fid'] = array(
+    'type' => 'int',
+    'description' => 'Field af_fid contains the foreign id of the feed (aggregator_feed.fid)',
   );
   return $schema;
 }
@@ -26,10 +30,15 @@ function aggregator_blocklist_schema_alter(&$schema) {
  * Aggregator_blocklist install script
  */
 function aggregator_blocklist_install() {
-  $schema = drupal_get_schema('aggregator_feed');
-  //db_add_field($table, $field, $spec, $keys_new = array())
-  db_add_field('aggregator_feed', 'ffid', $schema['fields']['ffid']);
-  db_add_field('aggregator_feed', 'rss_origin_url', $schema['fields']['rss_origin_url']);
+  $schema = drupal_get_schema('aggregator_blocklist_feed_extension');
+  if(!db_table_exists("aggregator_blocklist_feed_extension")) {
+    if(db_create_table("aggregator_blocklist_feed_extension", $schema)) {
+      drupal_set_message("Aggregator blocklist successfully created table: aggregator_blocklist_feed_extension");
+    }
+  }
+  if(!db_add_primary_key("aggregator_blocklist_feed_extension", array("af_fid"))) {
+    drupal_set_message("Setting primary key failed");
+  }
   drupal_set_message("Aggregator blocklist installed");
 }
 
@@ -37,7 +46,10 @@ function aggregator_blocklist_install() {
  * Aggregator_blocklist uninstall script
  */
 function aggregator_blocklist_uninstall() {
-  db_drop_field('aggregator_feed', 'ffid');
-  db_drop_field('aggregator_feed', 'rss_origin_url');
-  drupal_set_message("Aggregator blocklist uninstalled");
+  if(db_drop_table('aggregator_blocklist_feed_extension')) {
+    drupal_set_message("Aggregator blocklist uninstalled");
+  }
+  else {
+    drupal_set_message("Aggregator blocklist error uninstalling");
+  }
 }
