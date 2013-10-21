@@ -30,7 +30,7 @@ function aggregator_blocklist_block_view($delta = '') {
         $query->fields("f", array(
           "url", "title", "block", "fid"))
               ->fields("fm", array("uri"))
-              ->fields("fe", array("fm_fid", "rss_origin_url"))
+              ->fields("fe", array("fm_fid", "rss_origin_url", "view_style"))
               ->condition($query_and);
         $feed_result = $query->execute();
         $feed = $feed_result->fetchAssoc();
@@ -58,7 +58,7 @@ function aggregator_blocklist_block_view($delta = '') {
     $items = array();
     if (!empty($result)) {
       foreach ($result as $item) {
-        $items[] = theme('aggregator_blocklist_block_item', array('item' => $item));
+        $items[] = theme('aggregator_blocklist_block_item', array('item' => $item, 'view_style' => $feed['view_style']));
       }
     }
 
@@ -87,11 +87,28 @@ function aggregator_blocklist_block_view($delta = '') {
  * @ingroup themeable
  */
 function theme_aggregator_blocklist_block_item($variables) {
-  // Display the external link to the item.
-  $output  = '<div class="blocklist-item">';
-  $output .= '<span class="rss-date">' . date("d/m Y", $variables['item']->timestamp) . '</span>';
-  $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
-  $output .= '</div>';
+  switch($variables['view_style']) {
+    case 0:
+      $output  = '<div class="blocklist-item">';
+      $output .= '<span class="rss-date">' . date("d/m Y", $variables['item']->timestamp) . '</span>';
+      $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
+      $output .= '</div>';
+      break;
+    case 1:
+      $output  = '<div class="blocklist-item">';
+      $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
+      $output .= '<div class="rss-description">';
+      $output .= $variables["item"]->description;
+      $output .= '</div>';
+      //$output .= '<span class="rss-date">' . date("d/m Y", $variables['item']->timestamp) . '</span>';
+     // $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
+      $output .= '</div>';
+      break;
+    default:
+      $output  = '<div class="blocklist-item">';
+      $output .= t('No valid view style chosen');
+      $output .= '</div>';
+  }
   return $output;
 }
 
@@ -114,57 +131,20 @@ function theme_aggregator_blocklist_itemlist($variables) {
   $rss_title = $variables['feed']['title'];
   $page_url = ($variables['feed']['rss_origin_url'] == "") ? $variables['feed']['url'] : $variables['feed']['rss_origin_url'];
   $file = $variables['feed']['fm_fid'] ? file_load($variables['feed']['fm_fid']) : FALSE;
-  if(is_valid_image($variables['feed']['uri'])) {
-    /**
-     * scale thumbnail
-     *
-    $vars = array(
-      'element' => array (
-        '#name' => $variables['feed']['title'],
-        '#file' => $file,
-        '#show_names' => FALSE,
-        '#add_link' => FALSE,
-        '#children' => '<img class="rss_image" alt="logo" src="' . $url . '">',
-      ),
-    );
-    $output .= theme('media_thumbnail', $vars);
-     */
-    $output .= '<div class="rss-image">';
-    $output .= '<a href="' . $page_url . '">';
-    $output .= '<img src="' . $url . '" alt="' . $rss_title . '" title=" ' . $page_url . '">';
-    $output .= '</a>';
-    $output .= '</div>';
-  }
-  else {
-    $output .= $variables['read_more'];
+  if($variables['feed']["view_style"] != 1) {
+    if(strlen($variables['feed']['uri']) > 0) {
+      $output .= '<div class="rss-image">';
+      $output .= '<a href="' . $page_url . '">';
+      $output .= '<img src="' . $url . '" alt="' . $rss_title . '" title=" ' . $page_url . '">';
+      $output .= '</a>';
+      $output .= '</div>';
+    }
+    else {
+      $output .= $variables['read_more'];
+    }
   }
   $output .= '</div>';
   return $output;
-}
-
-/**
- * Returns a mime-type for valid image urls, false for invalid image urls
- *
- * @param string $url
- *   the url of the image to test
- *
- * @return bool
- *   returns true if the $url points to a valid image
- */
-function is_valid_image($url) {
-  if($url == "") {
-    return FALSE;
-  }
-  $info = getimagesize($url);
-  if(isset($info["mime"])) {
-    $valid_image_type = array(
-      'image/jpeg', 'image/pjpeg', 'image/png', 'image/x-png', 'image/gif'
-    );
-    if(in_array($info['mime'], $valid_image_type)) {
-      return $info['mime'];
-    }
-  }
-  return FALSE;
 }
 
 /**
@@ -218,7 +198,7 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
   if(isset($form['fid']['#value'])) {
     $q = db_select("aggregator_feed", "f");
     $q->join("aggregator_blocklist_feed_extension", "fe", "fe.af_fid = f.fid");
-    $q->fields("fe", array("fm_fid", "rss_origin_url", "af_fid"))
+    $q->fields("fe", array("fm_fid", "rss_origin_url", "af_fid", "view_style"))
       ->condition("af_fid", $form['fid']['#value']);
     $r = $q->execute();
     $feed = $r->fetchAssoc();
@@ -241,6 +221,17 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
     ),
     '#value' => array("fid" => $file->fid),
   );
+  
+  $form['view_style'] = array(
+    '#title' => t('View style'),
+    '#type' => 'select',
+    '#default_value' => $feed["view_style"],
+    '#options' => array(
+      0 => t('Date, title and feed image'),
+      1 => t('Title and description'),
+    ),
+  );
+  
   $form['rss_origin_url'] = array(
     '#type' => 'textfield',
     '#title' => t('URL to RSS website'),
@@ -317,11 +308,13 @@ function aggregator_blocklist_save_feed($edit) {
   if (!empty($edit['fid']) && !empty($edit['title'])) {
     //condition update
     //drupal_set_message("UPDATE");
+    debug($edit);
     db_update('aggregator_blocklist_feed_extension')
       ->condition('af_fid', $edit['fid'])
       ->fields(array(
         'fm_fid' => $edit['fm_fid'],
         'rss_origin_url' => $edit['rss_origin_url'],
+        'view_style' => $edit['view_style'],
       ))
       ->execute();
   }
@@ -346,6 +339,7 @@ function aggregator_blocklist_save_feed($edit) {
         'af_fid' => $edit['af_fid'],
         'fm_fid' => $edit['fm_fid'],
         'rss_origin_url' => $edit['rss_origin_url'],
+        'view_style' => $edit['view_style'],
       ))
       ->execute();
 

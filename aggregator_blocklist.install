@@ -23,6 +23,12 @@ function aggregator_blocklist_schema_alter(&$schema) {
     'type' => 'int',
     'description' => 'Field af_fid contains the foreign id of the feed (aggregator_feed.fid)',
   );
+  $schema['aggregator_blocklist_feed_extension']['fields']['view_style'] = array(
+    'type' => 'int',
+    'description' => 'Field view_style contains the view style of the block',
+    'not null' => TRUE,
+    'default' => '0',
+  );
   return $schema;
 }
 
