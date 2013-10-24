@@ -308,7 +308,6 @@ function aggregator_blocklist_save_feed($edit) {
   if (!empty($edit['fid']) && !empty($edit['title'])) {
     //condition update
     //drupal_set_message("UPDATE");
-    debug($edit);
     db_update('aggregator_blocklist_feed_extension')
       ->condition('af_fid', $edit['fid'])
       ->fields(array(
