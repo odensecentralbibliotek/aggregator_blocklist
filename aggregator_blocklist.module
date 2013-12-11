@@ -91,17 +91,15 @@ function theme_aggregator_blocklist_block_item($variables) {
     case 0:
       $output  = '<div class="blocklist-item">';
       $output .= '<span class="rss-date">' . date("d/m Y", $variables['item']->timestamp) . '</span>';
-      $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
+      $output .= '<span class="rss-link"><a target="_blank" href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
       $output .= '</div>';
       break;
     case 1:
       $output  = '<div class="blocklist-item">';
-      $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
+      $output .= '<span class="rss-link"><a target="_blank" href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
       $output .= '<div class="rss-description">';
       $output .= $variables["item"]->description;
       $output .= '</div>';
-      //$output .= '<span class="rss-date">' . date("d/m Y", $variables['item']->timestamp) . '</span>';
-     // $output .= '<span class="rss-link"><a href="' . check_url($variables['item']->link) . '">' . check_plain($variables['item']->title) . '</a></span>';
       $output .= '</div>';
       break;
     default:
@@ -134,7 +132,7 @@ function theme_aggregator_blocklist_itemlist($variables) {
   if($variables['feed']["view_style"] != 1) {
     if(strlen($variables['feed']['uri']) > 0) {
       $output .= '<div class="rss-image">';
-      $output .= '<a href="' . $page_url . '">';
+      $output .= '<a target="_blank" href="' . $page_url . '">';
       $output .= '<img src="' . $url . '" alt="' . $rss_title . '" title=" ' . $page_url . '">';
       $output .= '</a>';
       $output .= '</div>';
@@ -240,7 +238,7 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
   );
 
   if ($form_id == 'aggregator_form_feed') {
-    // aggregator_blocklist will take over submit and validate //
+    // aggregator_blocklist will take over submit //
     $form['#submit'][0] = 'aggregator_blocklist_form_feed_submit';
     $form['#validate'][0] = 'aggregator_form_feed_validate';
   }
@@ -249,7 +247,7 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
 /**
  * Form submission handler for aggregator_form_feed().
  *
- * @see aggregator_blocklist_form_feed_validate()
+ * 
  */
 function aggregator_blocklist_form_feed_submit($form, &$form_state) {
   if ($form_state['values']['op'] == t('Delete')) {
@@ -257,12 +255,6 @@ function aggregator_blocklist_form_feed_submit($form, &$form_state) {
     // Unset the title.
     unset($form_state['values']['title']);
   }
-  /*
-  if ($form_state['values']['op'] == t('Save')) {
-    $fid = $form_state['values']['fid'];
-    // Unset the feed id.
-    unset($form_state['values']['fid']);
-  }*/
   $form_state['values']['fm_fid'] = $form_state['input']['fid'];
   aggregator_save_feed($form_state['values']);
   //TODO save extra table
