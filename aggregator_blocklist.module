@@ -38,6 +38,7 @@ function aggregator_blocklist_block_view($delta = '') {
         $read_more = '<div class="more-link">' . l(t('See more'), $more_url, array(
           'attributes' => array(
             'title' => t($feed['title']),
+            'target' => '_blank',
           ),
         )) . '</div>';
         if($feed) {
