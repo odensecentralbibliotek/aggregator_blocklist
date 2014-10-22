@@ -201,8 +201,18 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
       ->condition("af_fid", $form['fid']['#value']);
     $r = $q->execute();
     $feed = $r->fetchAssoc();
-    if($feed) {
-      $file = $feed["fm_fid"] ? file_load($feed["fm_fid"]) : FALSE;
+    //If feed has info , and we are not fake-postback to remove image..then load image
+    if($feed && !isset($form_state["values"]["fm_fid_remove_button"]) ) {
+        if(isset($form_state["input"]["media"]["fm_fid"]) && $form_state["input"]["media"]["fm_fid"] != null) //media file id is not correct.
+        {
+            $file = isset($form_state["input"]["media"]["fm_fid"]) ? file_load($form_state["input"]["media"]["fm_fid"]) : FALSE;
+        }
+        else
+        {
+            //Is this still needed ?! ( maby for backward compatability.
+            $file = $feed["fm_fid"] ? file_load($feed["fm_fid"]) : FALSE;
+        }
+      
     }
   }
   /**
@@ -218,7 +228,7 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
         'types' => array('image'),
       ),
     ),
-    '#value' => array("fid" => $file->fid),
+    '#value' => array("fid" => isset($file->fid) ? $file->fid : null),
   );
   
   $form['view_style'] = array(
@@ -256,7 +266,7 @@ function aggregator_blocklist_form_feed_submit($form, &$form_state) {
     // Unset the title.
     unset($form_state['values']['title']);
   }
-  $form_state['values']['fm_fid'] = $form_state['input']['fid'];
+  //$form_state['values']['fm_fid'] = $form_state['input']['fid']; - $form_state['input']['fid'] is always same value ? 
   aggregator_save_feed($form_state['values']);
   //TODO save extra table
   aggregator_blocklist_save_feed($form_state['values']);
