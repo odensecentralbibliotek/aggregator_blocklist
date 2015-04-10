@@ -228,7 +228,7 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
         'types' => array('image'),
       ),
     ),
-    '#value' => array("fid" => isset($file->fid) ? $file->fid : null),
+    '#value' => array("fid" => isset($form_state['input']['media']['fm_fid']) ? $form_state['input']['media']['fm_fid'] : null),
   );
   
   $form['view_style'] = array(
