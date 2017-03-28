@@ -229,14 +229,12 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
         'types' => array('image'),
         'enabledPlugins' => array(
           'upload',
-          'media_default--media_browser_my_files'
+          'media_default--media_browser_1'
         ),
         'schemes' => array(
           'public' => 'public',
         ),
-        'file_directory' => 'product_offer',
         'file_extensions' => 'png gif jpg jpeg',
-        'max_filesize' => '2 MB',
         'uri_scheme' => 'public',
       )),
       '#default_value' => $feed["fm_fid"],
