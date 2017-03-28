@@ -211,14 +211,25 @@ function aggregator_blocklist_form_aggregator_form_feed_alter(&$form, &$form_sta
    **/
   $form['fm_fid'] = array(
     '#type' => 'media',
+    '#theme' => 'media_widget',
     '#title' => t('Attach image'),
     '#description' => t('The fully-qualified URL of the feed image.'),
     '#media_options' => array(
       'global' => array(
         'types' => array('image'),
-      ),
-    ),
-    '#value' => array("fid" => $file->fid),
+        'enabledPlugins' => array(
+          'upload',
+          'media_default--media_browser_my_files'
+        ),
+        'schemes' => array(
+          'public' => 'public',
+        ),
+        'file_directory' => 'product_offer',
+        'file_extensions' => 'png gif jpg jpeg',
+        'max_filesize' => '2 MB',
+        'uri_scheme' => 'public',
+      )),
+      '#default_value' => $feed["fm_fid"],
   );
   
   $form['view_style'] = array(
@@ -256,7 +267,7 @@ function aggregator_blocklist_form_feed_submit($form, &$form_state) {
     // Unset the title.
     unset($form_state['values']['title']);
   }
-  $form_state['values']['fm_fid'] = $form_state['input']['fid'];
+  //$form_state['values']['fm_fid'] = $form_state['input']['fid'];
   aggregator_save_feed($form_state['values']);
   //TODO save extra table
   aggregator_blocklist_save_feed($form_state['values']);
